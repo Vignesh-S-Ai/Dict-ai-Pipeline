@@ -8,10 +8,10 @@ from pathlib import Path
 class QualityThresholds:
     """Quality detection thresholds."""
 
-    blur_threshold: float = 100.0
+    blur_threshold: float = 60.0
     brightness_min: float = 80.0
     brightness_max: float = 200.0
-    noise_threshold: float = 50.0
+    noise_threshold: float = 80.0
 
 
 @dataclass

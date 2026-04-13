@@ -1,56 +1,80 @@
-"""Text parsing module for extracting structured data."""
-
 import re
 from typing import Dict, List
 from src.utils.logger import logger
 
 
+def clean_text(text: str) -> str:
+    """Clean OCR text by removing noise characters."""
+    text = text.replace("\n", " ")
+    text = re.sub(r"[^\w\s:/-]", "", text)  # remove weird symbols
+    text = re.sub(r"\s+", " ", text)  # normalize spaces
+    return text.strip()
+
+
+def extract_names(text: str) -> List[str]:
+    """Extract probable human names."""
+    candidates = re.findall(r"\b[A-Z][a-z]{2,}\s[A-Z][a-z]{2,}\b", text)
+
+    # 🚫 Filter out common non-name words
+    stopwords = {
+        "Our", "Solution", "Saas", "April", "March",
+        "Showcasing", "Company", "Project"
+    }
+
+    valid_names = []
+    for name in candidates:
+        words = name.split()
+        if not any(word in stopwords for word in words):
+            valid_names.append(name)
+
+    return list(set(valid_names))
+
+
+def extract_dates(text: str) -> List[str]:
+    """Extract dates in multiple formats."""
+    
+    patterns = [
+        r"\b\d{2}/\d{2}/\d{4}\b",        # 12/05/2023
+        r"\b\d{4}-\d{2}-\d{2}\b",        # 2023-05-12
+        r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s\d{4}\b"  # Apr 2025
+    ]
+
+    dates = []
+    for pattern in patterns:
+        dates.extend(re.findall(pattern, text))
+
+    return list(set(dates))
+
+
+def extract_ids(text: str) -> List[str]:
+    """Extract alphanumeric IDs."""
+    return re.findall(r"\b[A-Z0-9]{6,}\b", text)
+
+
 def parse_extracted_text(text: str) -> Dict[str, List[str]]:
-    """Parse extracted text to find names, dates, and IDs.
+    """Main parsing function."""
 
-    Args:
-        text: Raw OCR extracted text.
+    logger.info("Starting structured data extraction")
 
-    Returns:
-        Dictionary with lists of found names, dates, and IDs.
-    """
-    result = {"name": [], "dates": [], "ids": []}
+    cleaned = clean_text(text)
 
-    name_pattern = r"\b([A-Z][a-z]+)\s+([A-Z][a-z]+)\b"
-    names = re.findall(name_pattern, text)
-    result["name"] = [f"{n[0]} {n[1]}" for n in names]
-
-    date_pattern = r"\b(\d{2}/\d{2}/\d{4})\b"
-    dates = re.findall(date_pattern, text)
-    result["dates"] = dates
-
-    id_pattern = r"\b([A-Z]{1,3}\d{6,10})\b"
-    ids = re.findall(id_pattern, text)
-    result["ids"] = ids
+    names = extract_names(cleaned)
+    dates = extract_dates(cleaned)
+    ids = extract_ids(cleaned)
 
     logger.info(
-        f"Parsing results: {len(result['name'])} names, "
-        f"{len(result['dates'])} dates, {len(result['ids'])} IDs"
+        f"Parsing results: {len(names)} names, {len(dates)} dates, {len(ids)} IDs"
     )
 
-    return result
+    return {
+        "name": names,
+        "dates": dates,
+        "ids": ids,
+    }
 
 
 def detect_language(text: str) -> str:
-    """Detect if text contains Telugu characters.
-
-    Args:
-        text: Input text to analyze.
-
-    Returns:
-        Language code: 'telugu', 'english', or 'mixed'.
-    """
-    telugu_range = range(0x0C00, 0x0C7F)
-    telugu_chars = sum(1 for char in text if ord(char) in telugu_range)
-
-    if telugu_chars > 10:
-        return "telugu"
-    elif telugu_chars > 0:
-        return "mixed"
-    else:
+    """Basic language detection."""
+    if re.search(r"[a-zA-Z]", text):
         return "english"
+    return "unknown"

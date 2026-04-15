@@ -51,6 +51,30 @@ def extract_ids(text: str) -> List[str]:
     return re.findall(r"\b[A-Z0-9]{6,}\b", text)
 
 
+def extract_emails(text: str) -> List[str]:
+    """Extract email addresses."""
+    pattern = r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"
+    return list(set(re.findall(pattern, text)))
+
+
+def extract_phones(text: str) -> List[str]:
+    """Extract phone numbers (basic international/national)."""
+    # Matches formats like +1-234-567-8900, (123) 456-7890, 123-456-7890
+    pattern = r"\+?\d{1,3}?[-.\s]?\(?\d{1,4}?\)?[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}"
+    
+    candidates = re.findall(pattern, text)
+    # Filter out obvious non-phones (must have enough digits)
+    phones = [p.strip() for p in candidates if len(re.sub(r"\D", "", p)) >= 7]
+    return list(set(phones))
+
+
+def extract_amounts(text: str) -> List[str]:
+    """Extract currency amounts with symbols."""
+    # Matches $1,000.00, €50, Rs. 100
+    pattern = r"(?:[\$€£]|Rs\.?)\s?\d{1,3}(?:,\d{3})*(?:\.\d{2})?"
+    return list(set(re.findall(pattern, text)))
+
+
 def parse_extracted_text(text: str) -> Dict[str, List[str]]:
     """Main parsing function."""
 
@@ -61,15 +85,21 @@ def parse_extracted_text(text: str) -> Dict[str, List[str]]:
     names = extract_names(cleaned)
     dates = extract_dates(cleaned)
     ids = extract_ids(cleaned)
+    emails = extract_emails(cleaned)
+    phones = extract_phones(cleaned)
+    amounts = extract_amounts(text)  # Run on raw text to keep symbols if any
 
     logger.info(
-        f"Parsing results: {len(names)} names, {len(dates)} dates, {len(ids)} IDs"
+        f"Parsing results: {len(names)} names, {len(dates)} dates, {len(ids)} IDs, {len(emails)} emails, {len(phones)} phones, {len(amounts)} amounts"
     )
 
     return {
         "name": names,
         "dates": dates,
         "ids": ids,
+        "emails": emails,
+        "phones": phones,
+        "amounts": amounts,
     }
 
 

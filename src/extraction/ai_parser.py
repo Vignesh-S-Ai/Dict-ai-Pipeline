@@ -42,20 +42,29 @@ def extract_with_gemini(image: np.ndarray) -> Optional[Dict[str, Any]]:
 
     try:
         # Convert OpenCV BGR to RGB PIL Image
-        # cv2 uses BGR, Gemini expects RGB
         import cv2
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         pil_img = Image.fromarray(rgb_image)
 
-        logger.info("Sending image to Gemini for analysis...")
-        response = model.generate_content([PROMPT, pil_img])
+        logger.info("Sending image to Gemini for strict JSON analysis...")
         
-        # Clean response text (remove markdown blocks if present)
-        response_text = response.text.replace('```json', '').replace('```', '').strip()
+        # Next-level constraint: Force JSON mime-type so we never get markdown
+        config = genai.GenerationConfig(
+            response_mime_type="application/json",
+            temperature=0.1,  # Low temperature for precise data extraction
+        )
         
-        parsed_data = json.loads(response_text)
-        logger.info("Successfully extracted data with Gemini")
+        response = model.generate_content(
+            [PROMPT, pil_img],
+            generation_config=config
+        )
+        
+        parsed_data = json.loads(response.text)
+        logger.info("Successfully extracted structured data with Gemini")
         return parsed_data
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse Gemini JSON output: {e}\nRaw output: {response.text}")
+        return None
     except Exception as e:
         logger.error(f"Gemini extraction failed: {e}")
         return None
